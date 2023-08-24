@@ -1,0 +1,34 @@
+# 编译产物
+/target/
+
+# 依赖管理工具（如 Cargo）生成的文件
+Cargo.lock
+
+# 编辑器产生的临时文件
+**/*.swp
+**/*.swo
+**/*.swx
+**/*.bak
+**/*.bk
+
+# 编译器生成的临时文件和目录
+**/*.rs.bk
+**/*.rlib
+**/*.rmeta
+**/*.dSYM/
+
+# IDE（如 Visual Studio Code、IntelliJ IDEA）的工作区和配置文件
+/.vscode/
+/.idea/
+
+# 编辑器配置文件
+/.editorconfig
+
+# 编译器工具链配置文件
+/.rustup/
+
+# 工程生成的文档
+/doc/
+
+# 忽略自定义的配置文件
+/my_config.toml
