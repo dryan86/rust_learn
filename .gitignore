@@ -1,5 +1,5 @@
 # 编译产物
-/target/
+/*/target/
 
 # 依赖管理工具（如 Cargo）生成的文件
 Cargo.lock
