@@ -12,7 +12,6 @@ fn it_works_for_create(){
         assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id)));
 
 		let k = KittiesModule::kitties(kitty_id).unwrap();
-        System::events();
         System::assert_has_event(RuntimeEvent::KittiesModule(crate::Event::KittyCreated { who: account_id, kitty_id: kitty_id, kitty: k }));
 
         assert_eq!(KittiesModule::next_kitty_id(), kitty_id + 1 );
