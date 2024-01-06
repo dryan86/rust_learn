@@ -1,4 +1,4 @@
-use crate::{mock::*, Error, Event};
+use crate::{mock::*, Error};
 use super::*;
 use frame_support::{assert_ok, assert_noop};
 
@@ -12,7 +12,7 @@ fn it_works_for_create(){
         assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id)));
 
 		let k = KittiesModule::kitties(kitty_id).unwrap();
-        System::assert_has_event(RuntimeEvent::KittiesModule(crate::Event::KittyCreated { who: account_id, kitty_id: kitty_id, kitty: k }));
+        System::assert_has_event(Event::KittyCreated { who: account_id, kitty_id: kitty_id, kitty: k }.into());
 
         assert_eq!(KittiesModule::next_kitty_id(), kitty_id + 1 );
         assert_eq!(KittiesModule::kitties(kitty_id).is_some(), true);

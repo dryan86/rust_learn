@@ -56,5 +56,13 @@ impl pallet_insecure_randomness_collective_flip::Config for Test {}
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+	let mut ext:sp_io::TestExternalities = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into();
+	ext.execute_with(|| System::set_block_number(1));
+	ext
 }
+
+// pub fn new_test_ext() -> sp_io::TestExternalities {
+// 	let mut ext: sp_io::TestExternalities = system::GenesisConfig::default().build_storage::<Test>().unwrap().into();
+// 	ext.execute_with(|| System::set_block_number(1));
+// 	ext
+//    }
