@@ -41,17 +41,13 @@ pub mod pallet {
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
-		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// Type representing the weight of this pallet
 		type WeightInfo: WeightInfo;
 		type Randomness: Randomness<Self::Hash, BlockNumberFor<Self>>;
-
 		type Currency: Currency<Self::AccountId>;
-
 		#[pallet::constant]
 		type KittyPrice: Get<BalanceOf<Self>>;
-		
 		type PalletId: Get<PalletId>;
 	}
 
@@ -189,7 +185,7 @@ pub mod pallet {
 
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::sale())]
-		pub fn sale(origin: OriginFor<T>, kitty_id: u32, price: BalanceOf<T>) -> DispatchResult {
+		pub fn sale(origin: OriginFor<T>, kitty_id: u32, _price: BalanceOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			Self::kitties(kitty_id).ok_or::<DispatchError>(Error::<T>::InvalidKittyId.into())?;
