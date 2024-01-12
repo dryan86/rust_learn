@@ -2,7 +2,7 @@ use crate::{mock::*, Error};
 use super::*;
 use frame_support::{assert_ok, assert_noop};
 
-const KITTY_NAME: [u8; 4] = *b"test";
+const KITTY_NAME: [u8; 8] = *b"test1111";
 const ACCOUNT_BALANCE: u128 = 1000000000;
 
 #[test]
