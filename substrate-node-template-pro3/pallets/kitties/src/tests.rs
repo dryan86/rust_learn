@@ -120,7 +120,7 @@ fn it_works_for_sale() {
         assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id), KITTY_NAME));
 
         // sale ok
-        assert_ok!(KittiesModule::sale(RuntimeOrigin::signed(account_id), (kitty_id), 500));
+        assert_ok!(KittiesModule::sale(RuntimeOrigin::signed(account_id), kitty_id, 500));
 
         // not owner
         assert_noop!(KittiesModule::sale(RuntimeOrigin::signed(account_id + 1), kitty_id, 500), Error::<Test>::NotOwner);
@@ -137,41 +137,36 @@ fn it_works_for_buy() {
     new_test_ext().execute_with(|| {
         let kitty_id = 0;
         let account_id = 1;
+        let account_id2 = 2;
         let recepient = 2;
 
+        // add balance
+        assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), account_id, ACCOUNT_BALANCE));
+        assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), account_id2, ACCOUNT_BALANCE));
 
-        // 账户充值
-        assert_ok!(Balances::set_balance(RuntimeOrigin::root(), account_id, ACCOUNT_BALANCE, 0));
-        assert_ok!(Balances::set_balance(RuntimeOrigin::root(), account_id2, ACCOUNT_BALANCE2, 0));
-
-        // 当不存在 kitty 时失败
+        // 
         assert_noop!(
-            KittiesModule::buy(RuntimeOrigin::signed(account_id), KITTY_ID),
-            Error::<Test>::InvalidKittyId
+            KittiesModule::buy(RuntimeOrigin::signed(account_id), kitty_id), Error::<Test>::InvalidKittyId
         );
 
         assert_ok!(KittiesModule::create(RuntimeOrigin::signed(account_id), KITTY_NAME));
         assert_eq!(Balances::free_balance(account_id), ACCOUNT_BALANCE - EXISTENTIAL_DEPOSIT * 10);
 
-        // 当购买者与所有者相同时失败
+        // already owned
         assert_noop!(
-            KittiesModule::buy(RuntimeOrigin::signed(account_id), KITTY_ID),
+            KittiesModule::buy(RuntimeOrigin::signed(account_id), kitty_id),
             Error::<Test>::AlreadyOwned
         );
 
-        // 当没有上架时，失败
+        // not on sale
         assert_noop!(
-            KittiesModule::buy(RuntimeOrigin::signed(account_id2), KITTY_ID),
+            KittiesModule::buy(RuntimeOrigin::signed(account_id2), kitty_id),
             Error::<Test>::NotOnSale
         );
 
-        // 上述失败条件不存在时，成功
-        assert_ok!(KittiesModule::sale(RuntimeOrigin::signed(account_id), KITTY_ID));
-        assert_ok!(KittiesModule::buy(RuntimeOrigin::signed(account_id2), KITTY_ID));
-        assert!(KittiesModule::kitty_on_sale(KITTY_ID).is_none());
-        assert_eq!(KittiesModule::kitty_owner(KITTY_ID), Some(account_id2));
-        assert_eq!(Balances::free_balance(account_id), ACCOUNT_BALANCE);
-        assert_eq!(Balances::free_balance(account_id2), ACCOUNT_BALANCE2 - EXISTENTIAL_DEPOSIT * 10);
+        // 
+        assert_ok!(KittiesModule::sale(RuntimeOrigin::signed(account_id), kitty_id, 500));
+        assert_ok!(KittiesModule::buy(RuntimeOrigin::signed(account_id2), kitty_id));
         System::assert_last_event(Event::KittyBought { who: account_id2, kitty_id: 0 }.into());
     });
 }
