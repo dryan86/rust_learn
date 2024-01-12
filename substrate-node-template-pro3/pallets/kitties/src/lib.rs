@@ -5,6 +5,8 @@
 /// <https://docs.substrate.io/reference/frame-pallets/>
 pub use pallet::*;
 
+mod migrations;
+
 #[cfg(test)]
 mod mock;
 
@@ -25,6 +27,7 @@ pub mod pallet {
 	use frame_support::traits::{Currency, Randomness};
 	use sp_io::hashing::blake2_128;
 	use sp_runtime::traits::AccountIdConversion;
+	use crate::migrations;
 
 	pub type KittyId = u32;
 	pub type BalanceOf<T> =
@@ -33,9 +36,15 @@ pub mod pallet {
 	#[derive(
 		Encode, Decode, Clone, Copy, RuntimeDebug, PartialEq, Eq, Default, TypeInfo, MaxEncodedLen,
 	)]
-	pub struct Kitty(pub [u8; 16]);
+	// pub struct Kitty(pub [u8; 16]);
+	pub struct Kitty{
+		pub dna: [u8; 16],
+		pub name: [u8; 4],
+	}
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
@@ -96,6 +105,13 @@ pub mod pallet {
 		NoOwner,
 	}
 
+	#[pallet::hooks]
+	impl<T:Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_runtime_upgrade() -> Weight {
+			migrations::v1::migrate::<T>()
+		}
+	}
+
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
 	// These functions materialize as "extrinsics", which are often compared to transactions.
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
@@ -105,11 +121,12 @@ pub mod pallet {
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::create())]
-		pub fn create(origin: OriginFor<T>) -> DispatchResult {
+		pub fn create(origin: OriginFor<T>, name: [u8; 4]) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			let kitty_id = Self::get_next_id()?;
-			let kitty = Kitty(Self::random_value(&who));
+			let dna = Self::random_value(&who);
+			let kitty = Kitty {dna, name};
 
 			let price = T::KittyPrice::get();
 			// T::Currency::reserve(&who, price)?;
@@ -131,6 +148,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			kitty_id_1: KittyId,
 			kitty_id_2: KittyId,
+			name: [u8; 4],
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -144,12 +162,12 @@ pub mod pallet {
 			let kitty_2 = Self::kitties(kitty_id_2).ok_or(Error::<T>::InvalidKittyId)?;
 
 			let selector = Self::random_value(&who);
-			let mut data = [0u8; 16];
-			for i in 0..kitty_1.0.len() {
-				data[i] = (kitty_1.0[i] & selector[i]) | (kitty_2.0[i] & !selector[i]);
-			}
+			let dna = [0u8; 16];
+			// for i in 0..kitty_1.0.len() {
+			// 	data[i] = (kitty_1.0[i] & selector[i]) | (kitty_2.0[i] & !selector[i]);
+			// }
 
-			let kitty = Kitty(data);
+			let kitty = Kitty{dna, name};
 
 			let price = T::KittyPrice::get();
 			// T::Currency::reserve(&who, price)?;
@@ -187,14 +205,13 @@ pub mod pallet {
 		#[pallet::weight(T::WeightInfo::sale())]
 		pub fn sale(origin: OriginFor<T>, kitty_id: u32, _price: BalanceOf<T>) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-
-			Self::kitties(kitty_id).ok_or::<DispatchError>(Error::<T>::InvalidKittyId.into())?;
-
-			let owner = Self::kitty_owner(kitty_id).ok_or(Error::<T>::InvalidKittyId)?;
+			ensure!(Kitties::<T>::contains_key(kitty_id), Error::<T>::InvalidKittyId);
+			let owner = Self::kitty_owner(kitty_id).ok_or(Error::<T>::NoOwner)?;
 			ensure!(owner == who, Error::<T>::NotOwner);
-			ensure!(Self::kitty_on_sale(kitty_id).is_some(), Error::<T>::AlreadyOnSale);
+			ensure!(!KittyOnSale::<T>::contains_key(kitty_id), Error::<T>::AlreadyOnSale);
 
-			<KittyOnSale<T>>::insert(kitty_id, ());
+			KittyOnSale::<T>::insert(kitty_id, ());
+
 			Self::deposit_event(Event::KittyOnSale { who, kitty_id });
 
 			Ok(())
