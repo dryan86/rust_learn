@@ -14,6 +14,14 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+use sp_runtime::{
+    offchain::{
+        http, Duration,
+    },
+};
+
+use serde::{Deserialize, Deserializer};
+
 use frame_system::{
 	offchain::{
 		AppCrypto, CreateSignedTransaction, SendUnsignedTransaction,
@@ -25,7 +33,6 @@ use sp_runtime::{
 	RuntimeDebug,
 };
 use codec::{Decode, Encode};
-
 
 use sp_core::crypto::KeyTypeId;
 
@@ -63,6 +70,7 @@ pub mod crypto {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use frame_support::inherent::Vec;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
@@ -78,6 +86,36 @@ pub mod pallet {
 			self.public.clone()
 		}
 	}
+
+    #[derive(Deserialize, Encode, Decode)]
+    struct ApiInfo {
+        #[serde(deserialize_with = "de_string_to_bytes")]
+        server_version: Vec<u8>,
+        #[serde(deserialize_with = "de_string_to_bytes")]
+        status: Vec<u8>,
+        block_height: u32,
+    }
+
+    pub fn de_string_to_bytes<'de, D>(de: D) -> Result<Vec<u8>, D::Error>
+        where
+        D: Deserializer<'de>,
+        {
+            let s: &str = Deserialize::deserialize(de)?;
+            Ok(s.as_bytes().to_vec())
+        }
+
+    use core::{convert::TryInto, fmt};
+    impl fmt::Debug for ApiInfo {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(
+                f,
+                "{{ server_version: {}, status: {}, block_height: {} }}",
+                sp_std::str::from_utf8(&self.server_version).map_err(|_| fmt::Error)?,
+                sp_std::str::from_utf8(&self.status).map_err(|_| fmt::Error)?,
+                &self.block_height
+                )
+        }
+    }
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
@@ -217,26 +255,23 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		/// Offchain worker entry point.
 		fn offchain_worker(_block_number: T::BlockNumber) {
-			// let value: u64 = 42;
-			// // This is your call to on-chain extrinsic together with any necessary parameters.
-			// let call = Call::submit_data_unsigned { key: value };
+			// 获取btc实时价格
+			// get btc price
+            log::info!("OCW ==> Hello World from offchain workers!: {:?}", _block_number);
 
-			// // `submit_unsigned_transaction` returns a type of `Result<(), ()>`
-			// //	 ref: https://paritytech.github.io/substrate/master/frame_system/offchain/struct.SubmitTransaction.html
-			// _ = SubmitTransaction::<T, Call<T>>::submit_unsigned_transaction(call.into())
-			// 	.map_err(|_| {
-			// 	log::error!("OCW ==> Failed in offchain_unsigned_tx");
-			// });
-			
+            if let Ok(info) = Self::fetch_api_info() {
+                log::info!("OCW ==> api Info: {:?}", info);
+            } else {
+                log::info!("OCW ==> Error while fetch api info!");
+            }
+
+         	log::info!("OCW ==> Leave from offchain workers!: {:?}", _block_number);
+
+			// 提交数据到链上			
 			let number: u64 = 42;
 			// Retrieve the signer to sign the payload
 			let signer = Signer::<T, T::AuthorityId>::any_account();
 
-			// `send_unsigned_transaction` is returning a type of `Option<(Account<T>, Result<(), ()>)>`.
-			//	 The returned result means:
-			//	 - `None`: no account is available for sending transaction
-			//	 - `Some((account, Ok(())))`: transaction is successfully sent
-			//	 - `Some((account, Err(())))`: error occurred when sending the transaction
 			if let Some((_, res)) = signer.send_unsigned_transaction(
 				// this line is to prepare and return payload
 				|acct| Payload { number, public: acct.public.clone() },
@@ -252,4 +287,33 @@ pub mod pallet {
 			}
 		}
 	}
+
+	impl<T: Config> Pallet<T> {
+        fn fetch_api_info() -> Result<ApiInfo, http::Error> {
+            // prepare for send request
+            let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(8_000));
+            let request =
+                http::Request::get("https://api.hiro.so/ordinals/v1/");
+            let pending = request
+                .add_header("User-Agent", "Substrate-Offchain-Worker")
+                .deadline(deadline).send().map_err(|_| http::Error::IoError)?;
+            let response = pending.try_wait(deadline).map_err(|_| http::Error::DeadlineReached)??;
+            if response.code != 200 {
+                log::warn!("Unexpected status code: {}", response.code);
+                return Err(http::Error::Unknown)
+            }
+            let body = response.body().collect::<Vec<u8>>();
+            let body_str = sp_std::str::from_utf8(&body).map_err(|_| {
+                log::warn!("No UTF8 body");
+                http::Error::Unknown
+            })?;
+
+            // parse the response str
+            let api_info: ApiInfo =
+                serde_json::from_str(body_str).map_err(|_| http::Error::Unknown)?;
+
+            Ok(api_info)
+        }
+
+    }
 }
