@@ -9,13 +9,23 @@ mod erc20 {
     pub struct Erc20 {
         total_suply: Balance,
         balances: Mapping<AccountId, Balance>,
-        alowance: Mapping<(AccountId, AccountId), Balance>,
+        allowance: Mapping<(AccountId, AccountId), Balance>,
     }
 
     #[ink(event)]
     pub struct Transfer {
         #[ink(topic)]
         from: AccountId,
+        #[ink(topic)]
+        to: AccountId,
+        value: Balance,
+    }
+
+    #[ink(event)]
+    pub struct Approval {
+        #[ink(topic)]
+        from: AccountId,
+        #[ink(topic)]
         to: AccountId,
         value: Balance,
     }
@@ -33,8 +43,11 @@ mod erc20 {
         /// Constructor that initializes the `bool` value to the given `init_value`.
         #[ink(constructor)]
         pub fn new(total_suply: u128) -> Self {
+            let mut balances = Mapping::new();
+            balances.insert(Self::env().caller(), &total_suply);
             Self {
                 total_suply,
+                balances,
                 ..Default::default()
             }
         }
@@ -45,6 +58,11 @@ mod erc20 {
         }
 
         #[ink(message)]
+        pub fn allowance_of(&self, from: AccountId, to: AccountId) -> Balance {
+            self.allowance.get(&(from, to)).unwrap_or_default()
+        }
+
+        #[ink(message)]
         pub fn balance_of(&self, who: AccountId) -> Balance {
             self.balances.get(&who).unwrap_or_default()
         }
@@ -52,19 +70,62 @@ mod erc20 {
         #[ink(message)]
         pub fn transfer(&mut self, to: AccountId, value: Balance) -> Result<()> {
             let sender = self.env().caller();
-            let balance_from = self.balance_of(sender);
-            let balance_to = self.balance_of(to);
+            return self.transfer_helper(&sender, &to, value);
+        }
+
+        #[ink(message)]
+        pub fn transfer_from(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+        ) -> Result<()> {
+            let sender = self.env().caller();
+            let allowance = self.allowance.get(&(from, sender)).unwrap_or_default();
+
+            if allowance < value {
+                return Err(Error::AllowanceTooLow);
+            }
+
+            self.allowance.insert(&(from, sender), &(allowance - value));
+
+            return self.transfer_helper(&sender, &to, value);
+        }
+
+        #[ink(message)]
+        pub fn approve(&mut self, spender: AccountId, value: Balance) -> Result<()> {
+            let sender = self.env().caller();
+            self.allowance.insert(&(sender, spender), &value);
+            self.env().emit_event(Approval {
+                from: sender,
+                to: spender,
+                value,
+            });
+
+            Ok(())
+        }
+
+        pub fn transfer_helper(
+            &mut self,
+            from: &AccountId,
+            to: &AccountId,
+            value: Balance,
+        ) -> Result<()> {
+            let balance_from = self.balance_of(*from);
+            let balance_to = self.balance_of(*to);
 
             if balance_from < value {
                 return Err(Error::BalanceTooLow);
             }
 
-            self.balances.insert(sender, &(balance_from - value));
+            self.balances.insert(from, &(balance_from - value));
             self.balances.insert(to, &(balance_to + value));
 
-            self.env().emit_event(
-                Transfer { from: sender, to, value }
-            );
+            self.env().emit_event(Transfer {
+                from: *from,
+                to: *to,
+                value,
+            });
 
             Ok(())
         }
