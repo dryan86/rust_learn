@@ -191,10 +191,10 @@ mod erc20 {
             let alice_acc = ink_e2e::account_id(ink_e2e::AccountKeyring::Alice);
             let bob_acc = ink_e2e::account_id(ink_e2e::AccountKeyring::Bob);
             let transfer_msg = build_message::<Erc20Ref>(contract_account_id.clone()).call(|erc20|erc20.transfer(bob_acc.clone(), 100));
-            let res = client.call(&alice_acc, transfer_msg, 0, None).await;
+            let res = client.call(&ink_e2e::alice(), transfer_msg, 0, None).await;
             assert!(res.is_ok());
-            let balance_of_msg = build_message::<Erc20Ref>(contract_account_id.clone()).call(|erc20|erc20.balance_of(alice_acc.clone));
-            let balance_of_alice = client.call_dry_run(&alice_acc, &balance_of_msg, 0, None).await;
+            let balance_of_msg = build_message::<Erc20Ref>(contract_account_id.clone()).call(|erc20|erc20.balance_of(alice_acc.clone()));
+            let balance_of_alice = client.call_dry_run(&ink_e2e::alice(), &balance_of_msg, 0, None).await;
 
             assert_eq!(balance_of_alice.return_value(), 1134);
             Ok(())
