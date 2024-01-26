@@ -153,8 +153,8 @@ mod erc20 {
             assert_eq!(erc20.total_suply, 100001);
             assert_eq!(erc20.balance_of(accounts.alice), 100001);
 
-            let emitted_event = ink::env::test::recorded_events().collect::<Vec<>>();
-            let event = emitted_event[0];
+            let emitted_event = ink::env::test::recorded_events().collect::<Vec<_>>();
+            let event = &emitted_event[0];
             let decoded = <Event as scale::Decode>::decode(&mut &event.data[..]).expect("decoded error");
             match decoded {
                 Event::Transfer(Transfer { from, to, value }) => {
@@ -164,14 +164,6 @@ mod erc20 {
                 },
                 _ => panic!("unexpected event"),
             }
-        }
-
-        #[ink::test]
-        fn it_works() {
-            let mut erc20 = Erc20::new(false);
-            assert_eq!(erc20.get(), false);
-            erc20.flip();
-            assert_eq!(erc20.get(), true);
         }
     }
 
