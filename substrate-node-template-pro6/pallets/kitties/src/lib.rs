@@ -156,7 +156,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn get_next_id() -> Result<KittyId, DispatchError> {
+		pub fn get_next_id() -> Result<KittyId, DispatchError> {
 			NextKittyId::<T>::try_mutate(|next_id| -> Result<KittyId, DispatchError> {
 				let current_id = *next_id;
 				*next_id = next_id

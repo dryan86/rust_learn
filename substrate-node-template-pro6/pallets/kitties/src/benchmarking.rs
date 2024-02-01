@@ -3,33 +3,28 @@
 use super::*;
 
 #[allow(unused)]
-use crate::Pallet as Template;
+use crate::Pallet as KittiesModule;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
+
+fn assert_last_event<T: Config>(generic_event: <T as Config>::RuntimeEvent) {
+	frame_system::Pallet::<T>::assert_last_event(generic_event.into());
+}
 
 #[benchmarks]
 mod benchmarks {
 	use super::*;
 
 	#[benchmark]
-	fn do_something() {
-		let value = 100u32.into();
+	fn create() {
+		let kitty_id = KittiesModule::<T>::get_next_id().unwrap();
 		let caller: T::AccountId = whitelisted_caller();
 		#[extrinsic_call]
-		do_something(RawOrigin::Signed(caller), value);
+		create(RawOrigin::Signed(caller.clone()));
 
-		assert_eq!(Something::<T>::get(), Some(value));
+		let kitty = Kitties::<T>::get(kitty_id).unwrap();
+		assert_last_event::<T>(Event::KittyCreated{who: caller.clone(), kitty_id, kitty}.into())
 	}
 
-	#[benchmark]
-	fn cause_error() {
-		Something::<T>::put(100u32);
-		let caller: T::AccountId = whitelisted_caller();
-		#[extrinsic_call]
-		cause_error(RawOrigin::Signed(caller));
-
-		assert_eq!(Something::<T>::get(), Some(101u32));
-	}
-
-	impl_benchmark_test_suite!(Template, crate::mock::new_test_ext(), crate::mock::Test);
+	impl_benchmark_test_suite!(KittiesModule, crate::mock::new_test_ext(), crate::mock::Test);
 }
